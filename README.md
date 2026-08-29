@@ -99,8 +99,8 @@ marketplace to add.
 
 ## Spec-driven development
 
-`openspec` drives the change workflow: propose a change, apply it, archive it.
-The CLI ships in the devshell; `openspec init` generates the rest:
+`openspec` drives the change workflow: explore an idea, propose a change, apply
+it, archive it. The CLI ships in the devshell; `openspec init` generates the rest:
 
 | Path                         | Contents                                                          |
 | ---------------------------- | ----------------------------------------------------------------- |
