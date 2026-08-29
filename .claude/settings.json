@@ -7,8 +7,7 @@
     "allowUnsandboxedCommands": false
   },
   "enabledPlugins": {
-    "context7@claude-plugins-official": true,
-    "superpowers@superpowers-marketplace": true,
+    "superpowers@claude-plugins-official": true,
     "code-review@claude-plugins-official": true
   }
 }
