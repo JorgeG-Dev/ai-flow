@@ -24,23 +24,31 @@
             inherit system;
             config.allowUnfree = true;
           };
-        in
-        {
-          default = pkgs.mkShell {
+
+          # Vendor-neutral tooling, shared by every agent shell.
+          common = with pkgs; [
+            openspec
+            gh
+            git
+            ctx7
+          ];
+
+          # One shell per agent vendor. To add another, define it here on the
+          # same `common ++ [ ... ]` pattern and expose it in the attrset below.
+          claude = pkgs.mkShell {
             packages =
               with pkgs;
-              [
-                claude-code
-                openspec
-                gh
-                git
-                ctx7
-              ]
-              # bubblewrap is Linux-only; Darwin neither ships it nor needs it.
-              # Load-bearing on Linux: it backs the sandbox enabled in
-              # .claude/settings.json. Drop it and that confinement goes away.
+              common
+              ++ [ claude-code ]
+              # Claude Code's sandbox (enabled in .claude/settings.json) shells
+              # out to bubblewrap on Linux — load-bearing, not optional. Darwin
+              # neither ships it nor needs it.
               ++ lib.optionals stdenv.hostPlatform.isLinux [ bubblewrap ];
           };
+        in
+        {
+          inherit claude;
+          default = claude;
         }
       );
     };
