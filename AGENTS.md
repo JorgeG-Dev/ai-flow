@@ -1,9 +1,12 @@
 ## Spec-driven workflow
 
+OpenSpec owns planning. Superpowers owns execution. Neither takes the other's
+half.
+
 - Every new feature starts with `openspec-propose` — or with `openspec-explore`
-  first, when the shape of the work is not clear yet. OpenSpec owns the planning
-  phase: do NOT use Superpowers `brainstorming` or `writing-plans`, and do not
-  let `using-superpowers` route into them. Superpowers still owns execution.
+  first, when the shape of the work is not clear yet. Do NOT use Superpowers
+  `brainstorming` or `writing-plans`, and do not let `using-superpowers` route
+  into them.
 - Implementation follows TDD: write the failing test first, then the code.
   Delete any implementation written before its test.
 - Run Superpowers' `requesting-code-review` before every commit, and work in an
