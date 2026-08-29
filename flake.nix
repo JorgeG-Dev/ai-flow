@@ -30,7 +30,6 @@
             openspec
             gh
             git
-            ctx7
           ];
 
           # One shell per agent vendor. To add another, define it here on the
