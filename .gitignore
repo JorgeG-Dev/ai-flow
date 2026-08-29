@@ -10,3 +10,9 @@ result-*
 
 # Ignore personal claude configs
 .claude/settings.local.json
+
+# Ignore OpenSpec output — generated locally, not tracked by this template.
+# Projects built from this template should remove these lines; see README.
+openspec/
+.claude/commands/opsx/
+.claude/skills/openspec-*/
