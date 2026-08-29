@@ -3,22 +3,30 @@
 
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
-    flake-parts.url = "github:hercules-ci/flake-parts";
   };
 
   outputs =
-    inputs:
-    inputs.flake-parts.lib.mkFlake { inherit inputs; } {
+    { nixpkgs, ... }:
+    let
       systems = [
         "x86_64-linux"
         "aarch64-darwin"
         "aarch64-linux"
       ];
 
-      perSystem =
-        { pkgs, ... }:
+      forAllSystems = nixpkgs.lib.genAttrs systems;
+    in
+    {
+      devShells = forAllSystems (
+        system:
+        let
+          pkgs = import nixpkgs {
+            inherit system;
+            config.allowUnfree = true;
+          };
+        in
         {
-          devShells.default = pkgs.mkShell {
+          default = pkgs.mkShell {
             packages = with pkgs; [
               claude-code
               openspec
@@ -28,7 +36,7 @@
               bubblewrap
             ];
           };
-        };
+        }
+      );
     };
-
 }
