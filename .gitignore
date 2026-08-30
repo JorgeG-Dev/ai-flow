@@ -8,13 +8,15 @@ result-*
 # Ignore NixOS interactive test driver history
 **/.nixos-test-history
 
-# Ignore personal claude configs
-.claude/settings.local.json
-
-# OpenSpec generated bindings — regenerate with `openspec init`.
-# Safe to keep ignored in projects built from this template.
-.claude/commands/opsx/
-.claude/skills/openspec-*/
+# Claude Code config: track settings.json, ignore everything else under
+# .claude/ — personal settings, OpenSpec bindings (regenerate with
+# `openspec init`), and anything a future tool drops there.
+#
+# Tracking `.claude/commands/**` in particular breaks in-repo worktrees: the
+# sandbox denies writes anywhere under it, so `git worktree add` fails partway
+# through checkout with `cannot create directory at '.claude/commands/...'`.
+.claude/*
+!.claude/settings.json
 
 # OpenSpec specs and change artifacts. Ignored here only because the template
 # has no changes of its own — real projects should track these. See README.

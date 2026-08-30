@@ -49,65 +49,6 @@ rather than assuming.
 Add a subsection here as each vendor's devshell is added, covering its OpenSpec
 `--tools` target and how it installs the equivalent plugins.
 
-## Sandbox
-
-`.claude/settings.json` turns on Claude Code's sandbox, so the agent runs every
-Bash command under bubblewrap and a seccomp filter instead of asking permission
-each time:
-
-```json
-"sandbox": {
-  "enabled": true,
-  "autoAllowBashIfSandboxed": true,
-  "allowUnsandboxedCommands": false
-}
-```
-
-The trade is deliberate — the agent gets a quiet, wide working surface, and the
-blast radius stays inside the project. It costs two things worth knowing.
-
-### Nix is unavailable to the agent
-
-The seccomp filter blocks `socket(AF_UNIX, ...)`, and the Nix store is reached
-through a daemon socket. Every store operation fails from inside a session:
-
-```
-error: cannot create Unix domain socket: Operation not permitted
-```
-
-`nix develop`, `nix build`, `nix run`, and `nix flake update` are all affected.
-Pure evaluation (`nix eval --expr '1+1'`) still works, having never touched the
-store.
-
-This leaves the documented workflow intact: you enter the devshell first and the
-agent inherits it. What it prevents is the agent picking up a tool it just added
-to `flake.nix`. Add the package, then relaunch the agent from a fresh
-`nix develop`.
-
-To lift the restriction, add to the `sandbox` block:
-
-```json
-"network": { "allowAllUnixSockets": true }
-```
-
-Linux offers nothing narrower. `allowUnixSockets` takes a path list, but seccomp
-cannot match on paths, so that setting is macOS-only and silently ignored here.
-Enabling this grants access to **every** Unix socket the user can reach —
-`docker.sock`, `ssh-agent`, and dbus among them. Weigh that against a relaunch.
-
-### Git config is masked
-
-`.gitconfig` and `.gitmodules` are bind-mounted to `/dev/null`, so the agent can
-neither read nor write them, whether or not the files exist. Git reports
-`Permission denied`; libgit2 — which Nix uses to fetch `git+file://` flake
-inputs — reports the same condition as `'.gitmodules' is locked`. Submodule
-commands are unavailable to the agent.
-
-`sandbox.filesystem.allowGitConfig: true` restores access. Leave it off unless
-the project actually uses submodules: a writable git config lets an agent set
-aliases, a pager, or an `ext::` submodule URL that executes the next time **you**
-run git.
-
 ## Layout
 
 | Path         | Purpose                                                                  |
@@ -115,7 +56,7 @@ run git.
 | `flake.nix`  | Devshell definitions — one shell per agent vendor, over a shared toolset. |
 | `AGENTS.md`  | Shared agent instructions and the spec-driven workflow policy.            |
 | `CLAUDE.md`  | An `@AGENTS.md` import plus Claude's OpenSpec command bindings.           |
-| `.claude/`   | Claude-only config: sandbox settings, plugins, skills, commands, hooks.   |
+| `.claude/`   | Claude-only config: plugins, skills, commands, hooks.                    |
 | `openspec/`  | Spec-driven workflow config and change artifacts. Created by setup, not tracked here. |
 
 ## Agent instructions
@@ -134,9 +75,10 @@ Keep both short. Their contents load into the agent's context on every session,
 so anything written there carries a running token cost. Prefer exact commands
 over prose.
 
-Worth adding to `AGENTS.md` once there is a real project here: setup steps,
-build / test / lint commands, code conventions, and constraints the agent must
-respect.
+`AGENTS.md` ends with a **Project conventions** section for exactly this:
+setup steps, build / test / lint commands, code conventions, and constraints the
+agent must respect. Everything above that heading is template-stable; the
+section below it belongs to whoever works in the project.
 
 ## Plugins
 
@@ -184,60 +126,109 @@ upgrade with `openspec update`.
 
 ### Workflow routing
 
-OpenSpec and Superpowers both want the planning phase — Superpowers'
-`brainstorming` skill asserts it must run before any creative work, and OpenSpec
-expects the proposal step to own it.
+`AGENTS.md` reduces the workflow to eight numbered stages plus a table saying
+which stages each kind of work runs. Stages are written once; flows reference
+them by number. An earlier draft spelled out a separate step list per flow,
+which restated the same TDD and commit rules three times and let them drift.
 
-`AGENTS.md` settles it by nesting rather than choosing. OpenSpec owns the
-artifacts and their order; the Superpowers planning skills run *inside* that
-flow with their output paths overridden. `brainstorming` writes `brainstorm.md`
-and `writing-plans` writes `plan.md`, both into the change directory rather than
-their default `docs/superpowers/`. Both skills document that their output
-location is overridable by user preference, so this costs no fork and no patch —
-a line in `AGENTS.md` is the override.
+OpenSpec owns planning end to end. Well-defined work opens at
+`openspec-propose`; ill-defined work opens at `openspec-explore` and proposes
+afterwards. Superpowers is left with execution — debugging, worktrees, TDD,
+review, integration.
 
-Keep those two as separate files. OpenSpec does not track them, but it parses
-`tasks.md` checkboxes to report progress for `openspec list`, `status`, and
-`archive`. Folding plan micro-steps into `tasks.md` counts example checkboxes —
-including ones inside fenced code blocks — as real work, so a finished change
-reports as incomplete and archival stalls.
+Greenfield work is the same flow with every delta marked ADDED. Resist one giant
+change: a change that never finishes never archives.
 
-Two rules ride along:
+Four ordering decisions, each with a reason:
 
-- **Ceremony scales with risk.** Three tiers, chosen by two questions —
-  does it change how the code behaves, and if not, does it touch code at all?
-  Behavior changes (bug fixes included) get the full change: proposal,
-  worktree, TDD, `requesting-code-review`, archive. Code or build config with
-  no behavior change — refactors, test backfill, dependency bumps, lint rules —
-  gets `requesting-code-review` and a commit, no proposal and no worktree.
-  Prose-only edits are just made and shown as a diff. Committing and opening
-  PRs waits for the user in every tier, and no tier works directly on `main` —
-  every one gets a branch. The worktree is an escalation for long-running
-  feature work, not the only form of isolation.
-- **Converged discussions get promoted, never assumed.** When a design
-  conversation settles, the agent offers to open a change and waits for a yes.
+- **Worktree before propose.** OpenSpec performs no git operations, and a fresh
+  worktree contains only committed files. Creating it late leaves artifacts in
+  one checkout and code in another, forcing a manual copy. Creating it first
+  keeps `main` untouched and needs no merge-back branch.
+- **The proposal is the only record.** An earlier draft opened with Superpowers'
+  `brainstorming` and wrote the session to `brainstorm.md` afterwards. Dropping
+  brainstorming removed both the file and the seam it sat on — the proposal now
+  carries the reasoning, so it has to stand on its own rather than assume a
+  conversation nobody kept.
+- **`writing-plans` excluded.** It duplicates `tasks.md`, whose checkboxes
+  `openspec list`, `status`, and `archive` parse — merging micro-steps in counts
+  examples as real work and reports a finished change as incomplete.
+- **Shared stages are written for every flow that reaches them.** Stages 3 and 7
+  are the only proposal-only ones. Stages 4 and 8 each silently assumed a change
+  directory at one point, which broke the bug-fix flow: it arrives at stage 4
+  having skipped stage 3, so there is no `tasks.md` to loop over.
 
-That policy lives in `AGENTS.md` rather than `CLAUDE.md` because Superpowers
-exists for more than one agent, so the rule holds wherever it is read. Only the
-entry points are vendor-specific: those live in each vendor's own file, and the
-current names come from the OpenSpec docs rather than being restated here.
+#### Skills do not fire on their own
 
-Edits to either file take effect at the next session start, not immediately.
+Superpowers skills activate only when invoked by name. Prose in `AGENTS.md`
+loads once at session start and, by the time implementation begins, sits under
+thousands of tokens of working context. The built-in apply instruction is two
+lines — *read context files, work through pending tasks, mark complete as you
+go* — with no mention of TDD, delivered fresh as apply begins. It wins on
+recency and specificity. Tested: the same TDD instruction failed twice from
+`AGENTS.md` and worked when spoken at apply time.
 
-#### Prior art
+Three defences, weakest to strongest:
 
-Two published OpenSpec schemas solve this same overlap by vendoring a custom
-schema: [`superpowers-bridge`](https://github.com/JiangWay/openspec-schemas/tree/main/superpowers-bridge)
-and [`superspec`](https://github.com/danielhanold/superspec), the latter a
-repackaging of the former's origin. Both are worth reading, and both make
-`brainstorm.md` and `plan.md` first-class tracked artifacts, which the prose
-rules above cannot.
+1. **Imperatives at the point of use.** Every stage leads with a verb and names
+   the skill in full — `superpowers:test-driven-development`, never bare.
+   Phrasing matters at the margin: lead with the imperative, because a rule
+   opening "skills do NOT activate on their own" reads as one more prohibition
+   in a file where every capitalised NOT is one.
+2. **A re-read at each boundary.** The file cannot re-inject itself, so it
+   instructs a re-read at a point the loop already stops at.
+3. **Dispatch.** Stage 4 sends each task group to a fresh subagent. Its prompt
+   is written at the moment of dispatch — exactly the condition the test above
+   found to work, and the only one of the three that does not depend on an
+   hour-old file still carrying weight.
 
-This template deliberately takes the rules and skips the dependency: a schema
-bundle is adopted whole, pins its own OpenSpec and Superpowers baselines, and
-rides `openspec schema`, still marked experimental. That is a poor thing to hand
-every downstream clone. Adopt one directly if you want the full artifact
-pipeline.
+#### Skills overrun their handoff
+
+Superpowers skills are built to run end to end. Each ends by doing the next
+thing — right when the skill is the whole workflow, wrong when it is one step
+inside another:
+
+| Skill | Its last step | What it breaks |
+|---|---|---|
+| `receiving-code-review` | implements the feedback | bypasses `openspec-update-change`'s coherence pass |
+| `subagent-driven-development` | sets up a worktree, dispatches the final review, then calls `finishing-a-development-branch` | swallows stages 2, 5 and 6, and expects a Superpowers plan file and ledger rather than `tasks.md` |
+
+Each is handled by naming the stopping point, or by not adopting the skill at
+all. `subagent-driven-development` is the second case: `AGENTS.md` dispatches per
+task group itself, keeping OpenSpec as the artifact owner. That works precisely
+because the artifacts are on disk — a cold subagent reads the proposal and
+`tasks.md` for itself, so there is no session context to reconstruct in its
+prompt.
+
+Before adopting another skill, read its final step and ask whether that is where
+this workflow wants it to stop.
+
+#### Reviews
+
+`requesting-code-review` dispatches its own reviewer subagent and states that it
+never inherits the caller's history, so it needs no extra wrapping. It runs over
+each task group during stage 4 and once over the whole branch after it.
+
+Per-group review was excluded in an earlier draft, on the grounds that the
+skill's "after each task" guidance assumes a coordinator reviewing work it never
+saw. Dispatching implementers made that assumption true, so the exclusion was
+dropped.
+
+#### If prose is not enough
+
+Two published OpenSpec schemas inject instructions at each artifact step:
+[`superpowers-bridge`](https://github.com/JiangWay/openspec-schemas/tree/main/superpowers-bridge)
+and [`superspec`](https://github.com/danielhanold/superspec).
+
+The cost is a dependency adopted whole, pinning its own baselines and riding
+`openspec schema` while it is still experimental. Both also route TDD through
+`subagent-driven-development`'s transitive activation, which no longer exists in
+Superpowers 6.3.0 — adopting either as-is would not fix a dormant TDD.
+
+The channel still unused is `openspec/config.yaml`, the portable half of the
+generated output, which governs how artifacts get written. Anything it can emit
+into the `tasks.md` preamble arrives at apply time through OpenSpec's own
+machinery — no recency problem, no fork.
 
 ### Per-vendor targets
 
