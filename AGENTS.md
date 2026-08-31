@@ -24,7 +24,9 @@ One-line fixes never escalate.
 ### Stages
 
 1. **Frame.** Invoke the skill in your row, in conversation. Skip when the work
-   is already well defined.
+   is already well defined. After `openspec-explore`, end with the open
+   decisions written out — each with 2–4 concrete options and a recommendation
+   where one is clear, none where it is not. The user picks before stage 3.
 2. **Isolate.** Invoke `superpowers:using-git-worktrees`. NEVER work on `main`.
 3. **Propose.** Invoke `openspec-propose`. It writes the change directory, and
    it is the only record of how the work was decided — make it stand alone.
@@ -35,16 +37,17 @@ One-line fixes never escalate.
      sequentially — later groups build on earlier ones. It invokes
      `superpowers:test-driven-development` per checkbox (failing test first,
      delete any implementation written before its test), runs the tests, and
-     commits. Mark the checkboxes from its report, then run stage 5 over that
-     group before dispatching the next. Stop at every boundary even though
+     commits. Mark the checkboxes from its report before dispatching the next.
+     Stop at every boundary even though
      `openspec-apply-change` wants to continue — it arrives fresher than this
      file and mentions none of the above.
    - Without a proposal: the fix is a single unit. Implement it directly under
      `superpowers:test-driven-development`; dispatching costs more than it
      saves.
 5. **Review.** Invoke `superpowers:requesting-code-review`, which dispatches its
-   own reviewer — over each group's commits during stage 4, and once over the
-   whole branch after it.
+   own reviewer. Once, over the whole branch, after stage 4. Add per-group
+   reviews only when a change is long enough for a bad pattern to propagate —
+   past roughly eight groups.
 6. **Integrate.** Push, PR, and merge ALWAYS wait for the user; commits do not.
    Then invoke `superpowers:finishing-a-development-branch`.
 7. **Archive.** Invoke `openspec-archive-change`. ALWAYS last, NEVER before 5

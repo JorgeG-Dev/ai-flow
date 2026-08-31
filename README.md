@@ -150,6 +150,14 @@ Four ordering decisions, each with a reason:
   brainstorming removed both the file and the seam it sat on — the proposal now
   carries the reasoning, so it has to stand on its own rather than assume a
   conversation nobody kept.
+- **Stage 1 states its own exit condition.** `openspec-explore` describes itself
+  as "a stance, not a workflow" with "no mandatory outputs", and offers to
+  recommend a path only *if asked* — so `AGENTS.md` asks. Requiring decisions
+  with 2–4 options gives stage 1 a definition of done and hands stage 3
+  something settled to propose from. The durable home for that shape is
+  `openspec/config.yaml`'s `rules` for `design.md`, which is where explore's own
+  capture table sends design decisions; rules bind only when an artifact is
+  written, so the prose rule covers the conversational case.
 - **`writing-plans` excluded.** It duplicates `tasks.md`, whose checkboxes
   `openspec list`, `status`, and `archive` parse — merging micro-steps in counts
   examples as real work and reports a finished change as incomplete.
@@ -206,13 +214,16 @@ this workflow wants it to stop.
 #### Reviews
 
 `requesting-code-review` dispatches its own reviewer subagent and states that it
-never inherits the caller's history, so it needs no extra wrapping. It runs over
-each task group during stage 4 and once over the whole branch after it.
+never inherits the caller's history, so it needs no extra wrapping. It runs once,
+over the whole branch.
 
-Per-group review was excluded in an earlier draft, on the grounds that the
-skill's "after each task" guidance assumes a coordinator reviewing work it never
-saw. Dispatching implementers made that assumption true, so the exclusion was
-dropped.
+Per-group review was tried and reverted. Dispatching implementers made the
+skill's "after each task" guidance applicable — the coordinator genuinely no
+longer sees the work — but measured on a four-group change it turned five review
+passes into the largest single cost of the run. Its value is catching a bad
+pattern before it propagates into later groups, which is worth little when few
+groups remain. Past roughly eight groups that trade flips; below it, the branch
+review catches the same things later and once.
 
 #### If prose is not enough
 
